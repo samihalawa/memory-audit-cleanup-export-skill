@@ -96,3 +96,16 @@ When the runtime exposes `memory_list` / `memory_read` / `memory_write` / `memor
 - Project stores can be isolated from global memory, so a global preference repeated inside a project store is NOT a duplicate; dedupe only within a store or between global files.
 - Merge files only within the same scope; after a merge, `memory_delete` the absorbed file (read it first for `if_version`) and repoint `[[links]]`.
 - Never announce saves inside user-facing copy; the report after the export lists them.
+
+## Reconcile against session histories (mandatory)
+
+The owner's canonical decisions, names and paths live in his private agent sessions, not in memory. Memory is a cache of them. Before classifying any project, domain, brand, status or path entry as KEEP or SUPERSEDED, check it against:
+
+1. The per-project Claude Code memory stores (`~/.claude/projects/*/memory/*.md`, especially the store for the matching repo): these are the distilled canonical decisions.
+2. The most recent raw sessions that mention the entity: `rg -l -i --no-messages "<term>" ~/.claude/projects ~/.codex/sessions/<current year>/<last 2 months>`, newest first; read the matching passages. Use `rg` — `find | xargs grep` over the ~3,000 monthly session files is too slow.
+3. Codex `~/.codex/memories/MEMORY.md`, Copilot `~/.copilot/session-state`, Kimi `~/.kimi`, and claude.ai chats (conversation_search) when the entity appears there.
+4. Live state when cheap and read-only (`dig`, `curl -sI`, provider APIs) to confirm a current-state claim.
+
+The newest of these sources wins over any memory line; fold the older value in as "(previously X)". Record each conflict you resolved and which source settled it in the report.
+
+Ownership split: the local Claude desktop task `memory-audit-cleanup-daily` (04:00) owns the Mac stores (`~/.claude/projects/*/memory`, `~/.codex/memories`). A cloud run owns only the claude.ai memory store (`mcp__memory__*`). Both update the one canonical export `AI_REPORTS_MASTER/MEMORY_AUDIT/memory-export.md` on Drive in place; each run rewrites only its own section and leaves the other's untouched.
