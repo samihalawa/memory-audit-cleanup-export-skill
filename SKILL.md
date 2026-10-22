@@ -82,3 +82,17 @@ When run on a schedule with nobody watching:
 - Write the export plus the report to one canonical file, overwritten each run (no dated copies). Use the path the scheduler prompt names; otherwise `~/memory-audit/memory-export.md`.
 - Never delete an entry created in the last 24 hours as STALE; a fresh entry may describe work still in flight.
 - If nothing changed, write a one-line "no changes" stamp and stop.
+
+## claude.ai memory store (`mcp__memory__*` tools)
+
+When the runtime exposes `memory_list` / `memory_read` / `memory_write` / `memory_str_replace` / `memory_append` / `memory_delete`:
+
+- Inventory with `memory_list` (no prefix lists global files and every `/projects/<uuid>/` store). Read up to 20 paths per `memory_read`; a file containing `=== ` must be read alone.
+- Writes are capped at **10 per turn** (deletes count). Plan the batch before writing: unsafe/never-store removals first, then supersessions, then merges/deletes of emptied files, then cosmetic fixes. When the budget is spent, stop writing, report the exact pending list, and continue next turn or next scheduled run — never retry a budget refusal in the same turn.
+- Every write needs `if_version` from a read in this turn (or the previous write's result). Prefer `memory_str_replace` for one-line changes; `memory_write` replaces the whole file, so carry over every line, including lines tagged `[observed]`/`[inferred]`, dated Claude Code log lines and `(for=code)` markers.
+- Format: frontmatter `name` (path stem), `description` (one line, <150 chars, names the people/projects/places inside; sensitive files get a topic-only description), `sources` (keep existing, add `chat`), `aliases` (≤8). Content lines tagged `[stated]` only.
+- Never-store (delete on sight, no placeholder): government-ID / card / account numbers, immigration status, caste, a minor user's age, sexual history, abuse, criminal history or proceedings (including criminal case numbers and defence counsel), crime-victim status, suicide/self-harm/disordered eating, health or personality inferences the user did not state. Lines labelled "inferred/observed preferences" that the user never stated are NOT MINE.
+- Stated health, finances, religion etc. stay as stated; put any rewrite of such a file in its own write, after the ordinary writes.
+- Project stores can be isolated from global memory, so a global preference repeated inside a project store is NOT a duplicate; dedupe only within a store or between global files.
+- Merge files only within the same scope; after a merge, `memory_delete` the absorbed file (read it first for `if_version`) and repoint `[[links]]`.
+- Never announce saves inside user-facing copy; the report after the export lists them.
