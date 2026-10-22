@@ -22,7 +22,7 @@ for d in ./*/memory; do
 done | sort -rn
 ```
 
-Other stores, when present: `~/.codex/memories/` (Codex consolidates `raw_memories.md` and `rollout_summaries/` into `MEMORY.md` itself, so edit only `MEMORY.md` and only to remove entries; never hand-edit pipeline inputs), and any native memory tool the runtime exposes (Notion memory, ChatGPT memory, etc.). Report a store you cannot read as an exact unread slice.
+Other stores, when present: `~/.codex/memories/` (Codex consolidates `raw_memories.md` and `rollout_summaries/` into `MEMORY.md` itself, so edit only `MEMORY.md` and only to remove entries; never hand-edit pipeline inputs). Codex `MEMORY.md` is newest-first `# Task Group: <title>` blocks, so remove whole blocks: copy it to a backup, split the header list (`grep -n '^# Task Group'`) into ranges for parallel read-only classifiers that each write `<line>\t<verdict>\t<replacing line>\t<reason>` rows, check no SUPERSEDED/DUPLICATE row points at a block also being removed, then drop the flagged blocks in one awk pass and copy back only if the live file still equals the backup (Codex may have rewritten it meanwhile). Also include any native memory tool the runtime exposes (Notion memory, ChatGPT memory, etc.). Report a store you cannot read as an exact unread slice.
 
 Claude Code format: one `.md` per memory with frontmatter (`name`, `description`, `metadata.type` = user | feedback | project | reference), feedback/project bodies carry `**Why:**` and `**How to apply:**`, `[[slug]]` links other memories, and each store has a `MEMORY.md` index of `- [Title](file.md) — hook` lines. Keep that format.
 
