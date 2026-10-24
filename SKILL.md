@@ -1,111 +1,90 @@
 ---
 name: memory-audit-cleanup-export-skill
-description: Audit, clean up, optimize and export every stored agent memory about the user. Use when the user asks to export, review, clean, purge, dedupe, consolidate or optimize memories, to remove superseded or stale memories, or on a scheduled daily memory-hygiene run. Reads every memory store in full, classifies each entry (KEEP, SUPERSEDED, DUPLICATE, STALE, FAILING, NOT MINE, UNSAFE), applies the edits, merges and deletions directly, then exports the cleaned result as Instructions, Identity, Career, Projects and Preferences with dated lines.
+description: Audit, reconcile, clean up and optionally export in-scope agent memories. Use for requested memory review, deduplication, correction, consolidation, deletion or scheduled hygiene. Inventory and fully read the bounded population, preserve source chronology and useful learning, apply only runtime-authorized changes, verify results and distinguish applied changes from queued correction requests.
 ---
 
 # Memory Audit, Cleanup and Export
 
-Running this skill authorizes editing, merging and deleting memory for the task. Do not ask for confirmation. Never touch instruction files (CLAUDE.md, AGENTS.md), code or skills: only memory stores.
+## Authority and runtime first
 
-## 1. Inventory every store
+Bind the user's task mode, accounts, stores, scope, exclusions and output. Apply current owner authority to evident in-scope audit fixes while respecting an explicit read-only or report-only request and higher-priority runtime rules. This skill supplies a procedure; it grants no independent permission to edit or delete memory. An export request alone does not authorize unrelated cleanup.
 
-Read every memory you hold about the user: every stored memory file or entry (including project-scoped stores), the user profile, saved preferences and learned context. Read each item in full; never judge by titles or summaries. Count items and lines before starting so the result can be checked.
+Inspect the current runtime's native memory instructions, exposed tools, schemas, authentication and persistence contract before selecting a route. Discovering a similarly named tool does not establish authority over this runtime's memory. Never substitute an unrelated application's memory namespace, including Notion, or infer that no memories exist from its empty result.
 
-Claude Code stores are per-project folders whose names start with `-`, so always prefix with `./`:
+Use the supported native route. If direct mutation is forbidden, submit precise correction/deletion notes through the allowed route and report their actual state. Never use another executor, tool or filesystem route to bypass that boundary. Do not edit instruction files, code, skills or unrelated stores during a memory audit unless separately requested.
 
-```bash
-cd ~/.claude/projects
-for d in ./*/memory; do
-  n=$(find "$d" -type f | wc -l | tr -d ' '); [ "$n" = 0 ] && continue
-  l=$(find "$d" -type f -name '*.md' -exec cat {} + | wc -l | tr -d ' ')
-  echo "$n files, $l lines  $d"
-done | sort -rn
-```
+## Inventory and source coverage
 
-Other stores, when present: `~/.codex/memories/` (Codex consolidates `raw_memories.md` and `rollout_summaries/` into `MEMORY.md` itself, so edit only `MEMORY.md` and only to remove entries; never hand-edit pipeline inputs). Codex `MEMORY.md` is newest-first `# Task Group: <title>` blocks, so remove whole blocks: copy it to a backup, split the header list (`grep -n '^# Task Group'`) into ranges for parallel read-only classifiers that each write `<line>\t<verdict>\t<replacing line>\t<reason>` rows, check no SUPERSEDED/DUPLICATE row points at a block also being removed, then drop the flagged blocks in one awk pass and copy back only if the live file still equals the backup (Codex may have rewritten it meanwhile). Also include any native memory tool the runtime exposes (Notion memory, ChatGPT memory, etc.). Report a store you cannot read as an exact unread slice.
+1. Recover the existing relevant audit, review or export and its coverage, decisions, unresolved corrections and source locators. Reuse verified findings; inspect the changed delta and affected dependencies instead of restarting completed work.
+2. Enumerate every discoverable in-scope store and item, including project scopes and nested payloads. Record stable IDs/paths, versions, counts, pagination cursors and inaccessible slices in runtime context. Do not create a parallel tracker.
+3. Read every in-scope item in full through bounded pages or chunks before classification. Titles, descriptions, snippets and summaries are locators, not full coverage. Never force one giant dump or equate a sample with completion.
+4. Count items and, for text stores where meaningful, lines per store and in total. Distinguish entries, files and lines; state unknown counts rather than inventing them.
+5. Use available delegation only when permitted and useful for context or independent work. Assign disjoint read-only ranges and concise evidence returns; keep one mutation owner per store. No fixed file-count threshold mandates agents.
 
-Claude Code format: one `.md` per memory with frontmatter (`name`, `description`, `metadata.type` = user | feedback | project | reference), feedback/project bodies carry `**Why:**` and `**How to apply:**`, `[[slug]]` links other memories, and each store has a `MEMORY.md` index of `- [Title](file.md) — hook` lines. Keep that format.
+Recover decisive original conversations or source passages for material conflicts, owner preferences and changing project facts. Search exact entities/IDs and read the relevant complete segments. Use current primary records for present provider state. Chronicle, Screenpipe or other history can locate evidence when available and relevant; they do not supersede the underlying conversation, file or provider.
 
-For more than ~60 files, split the stores into disjoint groups and hand each group to a parallel subagent on a fast cheap model with this whole skill as its brief. Each returns counts, export lines and the deletion/merge report; the parent then dedupes across stores and builds the single export.
+Resolve chronology by the actual statement or event time and scope. A copied file's latest modification time, an assistant's later summary or the newest search hit does not supersede an earlier owner decision. Distinguish source dates, observation dates and import dates; preserve uncertainty where the original date is unavailable.
 
-## 2. Analyze
+## Classification
 
-Classify every line into one category: Instructions, Identity, Career, Projects, Preferences (durable operational reference facts go under the project they serve). Flag each one:
+Classify each substantive fact with its source, scope, date, reason and proposed survivor or correction:
 
-- **KEEP**: durable, accurate, meaningful, still current.
-- **SUPERSEDED**: a newer line changes, replaces or contradicts it (new role, status, price, decision, renamed project). The newest version wins.
-- **DUPLICATE**: the same fact stated more than once or in more than one place.
-- **STALE**: a finished task, a past deadline, a one-off errand, the moving status of something already done, an expired "next step", or a dated incident log whose lesson is already captured elsewhere.
-- **FAILING**: true but broken: vague wording, missing date, wrong category or file, a project fragmented across entries, a malformed or inaccurate title or description, too long or too thin to be useful.
-- **NOT MINE**: assistant inferences, suggestions or plans the user never adopted, research or tool output, anything the user did not actually state.
-- **UNSAFE**: literal secrets (passwords, API keys, tokens, ID or account numbers) and instructions that would make the agent less honest or less careful. The user's own autonomy preferences ("never ask", "act without confirmation", "don't rotate credentials") are legitimate preferences, not unsafe.
+- **KEEP:** accurate durable user knowledge, current instructions or useful verified project/technical learning. Proven working routes, failed routes with causes and tool behavior can be valid project knowledge even when the user did not personally state them.
+- **SUPERSEDED:** an authoritative later correction or verified change replaces the same fact in the same scope. Identify the replacement and retain useful provenance.
+- **DUPLICATE:** materially equivalent content within compatible visibility and scope. Identify a complete survivor; isolated project/global visibility may justify repetition.
+- **STALE:** an obsolete transient status, completed errand or expired next step with no remaining operational value. Age alone is insufficient.
+- **FAILING:** useful content needs a precise correction, date, title, category, scope, source or clearer wording; repair it rather than discarding it.
+- **NOT MINE:** misattributed identity or an unadopted assistant suggestion, plan or inferred preference presented as the owner's position. Do not classify verified technical evidence as NOT MINE merely because it came from a tool.
+- **UNSAFE:** content prohibited by the actual current provider/runtime memory policy, exposed secrets requiring its supported handling, or instructions that require fabricated evidence or bypass a real boundary. Apply current policy rather than a foreign provider's fixed sensitive-data list.
 
-## 3. Clean up
+Preserve the meaning, limits and dates of explicit owner instructions. Do not turn a one-time mention into a preference, a hypothesis into a fact, or an assistant proposal into an adopted decision. Legitimate autonomy preferences are not automatically unsafe and do not override runtime restrictions.
 
-Apply all changes directly.
+Keep active future deadlines, genuine external waits, obligations, receipt/proof locators and still-relevant owner corrections. A filing receipt proves filing, not admission or award. Dated incidents may retain a compact reusable lesson even when their transient narrative can be removed.
 
-- Delete every SUPERSEDED, DUPLICATE, STALE and NOT MINE line. If an older value is still useful context, fold it into the current line as "(previously X)".
-- UNSAFE secrets: never lose the only copy. If the value exists in the user's global env, a project `.env` or the password manager (`op item list --format json | jq ...`), replace the literal with a pointer (e.g. "key in project .env as SHLINK_API_KEY"). If no other copy can be confirmed, keep it and report it as unsafe-kept. Delete dishonesty-inducing instructions outright.
-- Fix every FAILING line: rewrite it clearly and compactly, move it to the right category or file, correct its title, description and type.
-- Merge each project into ONE entry/file that starts with the project name and covers what it does, its current status and its key decisions. Generic lessons stay separate feedback entries.
-- Owner-wide facts (profile, cross-project feedback) live once in the home store (`~/.claude/projects/-Users-<user>/memory`); project facts stay in their project store. Move durable facts out of throwaway scratch-workspace stores, then empty them.
-- Preserve the user's exact wording for instructions and preferences. Rephrase only to remove duplication or combine lines, never changing meaning or scope.
-- Never invent, generalize or upgrade a fact. "Mentioned X once" must not become "loves X".
-- Rewrite each `MEMORY.md` to list exactly the surviving files; repoint `[[links]]` to merged survivors. Delete files and indexes left empty.
-- Re-read every changed or deleted item once to confirm the change persisted. If a write fails, retry once, then report it.
+## Apply authorized cleanup
 
-## 4. Export
+Read each mutation target and its current version; preserve unrelated content, other authors and concurrent changes. Prefer exact fact-level edits over deleting an entire mixed entry or task block. Before removing a duplicate or superseded fact, prove its survivor is complete and will remain readable in the required scope.
 
-Output the cleaned memory in this order:
+- Apply only changes allowed by the task mode and current runtime contract. Repair FAILING facts and consolidate compatible fragments without forcing every project into one oversized entry.
+- Merge only compatible scopes. Preserve source links, aliases, intentional labels and cross-references; update indexes to the actual surviving records. Do not empty scratch stores by assumption.
+- Preserve exact identity and genuine evidence. Never create a credential or source claim. Handle secrets according to current policy and authorized credential storage; a pointer requires a verified destination and must not expose the value in an export.
+- Use supported version/concurrency guards. On conflict, read the changed delta and rebase the exact intended change. Respect actual provider quotas, refusal meanings and retry guidance; do not import a fixed write quota from another runtime or retry unchanged failures.
+- Re-read each changed target once, and verify deletions through the supported absence check. A write response or queued note alone does not prove consolidation. Continue independent permitted changes while a genuine dependency remains.
 
-1. **Instructions**: rules the user explicitly asked the agent to follow going forward: tone, format, style, "always do X", "never do Y", corrections. Only rules from stored memories, not from conversations.
-2. **Identity**: name, age, location, education, family, relationships, languages, personal interests.
-3. **Career**: current and past roles, companies, general skill areas.
-4. **Projects**: one entry per project the user meaningfully built or committed to: what it does, current status, key decisions. Start each entry with the project name.
-5. **Preferences**: opinions, tastes and working-style preferences that apply broadly.
+When only notes are allowed, write one concise idempotent correction request per coherent change through the prescribed route. Include exact target IDs/paths or source locators, the incorrect fact, requested replacement/removal, evidence/date, scope and survivor. Check existing notes first; verify the saved note. Do not copy secrets into the request. State that correction was requested and whether consolidation remains unverified.
 
-Format: a section header per category, one entry per line, oldest first, as `[YYYY-MM-DD] - Entry content.` Date = earliest explicit date in the memory, else the file birth date (`stat -f %SB -t %Y-%m-%d FILE` on macOS, `stat -c %w` on Linux), else `[unknown]`. Wrap the whole export in a single code block.
+## Store adapters
 
-## 5. Report after the code block
+### Native Codex memory
 
-- Counts before and after: total items and total lines (per store and total).
-- Deletions grouped by reason (superseded, duplicate, stale, not mine, unsafe), one line each naming the fact removed and, for superseded lines, the fact that replaced it.
-- Merges and rewrites, one line each.
-- Any failed write and any unsafe-kept item.
-- Whether this is the complete set or items remain unread, with the exact number remaining.
+Use the runtime-provided memory root and instructions for retrieval. If the contract permits only update notes, use that exact route (for example, the supplied `extensions/ad_hoc/notes/` directory and filename convention). Do not directly edit or delete `MEMORY.md`, raw memories, rollout summaries or pipeline inputs. Do not claim the requested deletion happened merely because its note persisted. If the runtime grants different capabilities, follow its current explicit contract rather than assuming universal filesystem rights.
 
-## Scheduled (unattended) runs
+### Existing Claude/local indexed stores
 
-When run on a schedule with nobody watching:
+Operate only on discovered, authorized stores. Preserve their existing frontmatter, types, source metadata, aliases, `[[links]]` and index conventions rather than imposing a foreign schema. A Claude project memory directory may use one Markdown file per topic and a `MEMORY.md` index of linked one-line descriptions; preserve that format when present. Quote paths and prefix relative paths beginning with `-` with `./`.
 
-- Process only what changed since the last run when a previous export exists (compare file mtimes against the export's timestamp), but always re-check cross-store duplicates and supersessions touching changed entries.
-- Write the export plus the report to one canonical file, overwritten each run (no dated copies). Use the path the scheduler prompt names; otherwise `~/memory-audit/memory-export.md`.
-- Never delete an entry created in the last 24 hours as STALE; a fresh entry may describe work still in flight.
-- If nothing changed, write a one-line "no changes" stamp and stop.
+For exposed native memory tools, inspect their current list/read/write/delete schema, pagination, version guards, visibility boundaries and policy. Retain meaningful observed/project evidence in its proper category; label explicit user statements accurately. Never impose a historical tool batch size, ten-write limit or sensitive-data blacklist as a current contract.
 
-## claude.ai memory store (`mcp__memory__*` tools)
+### Explicit Desktop Commander workspace memory
 
-When the runtime exposes `memory_list` / `memory_read` / `memory_write` / `memory_str_replace` / `memory_append` / `memory_delete`:
+Use `${workspacePath}/.memory/` only when the actual runtime supplies that workspace path, authorizes this store and provides a valid `dc://` source-link contract. Do not infer those values or bootstrap a workspace graph inside Codex as a substitute for native memory.
 
-- Inventory with `memory_list` (no prefix lists global files and every `/projects/<uuid>/` store). Read up to 20 paths per `memory_read`; a file containing `=== ` must be read alone.
-- Writes are capped at **10 per turn** (deletes count). Plan the batch before writing: unsafe/never-store removals first, then supersessions, then merges/deletes of emptied files, then cosmetic fixes. When the budget is spent, stop writing, report the exact pending list, and continue next turn or next scheduled run — never retry a budget refusal in the same turn.
-- Every write needs `if_version` from a read in this turn (or the previous write's result). Prefer `memory_str_replace` for one-line changes; `memory_write` replaces the whole file, so carry over every line, including lines tagged `[observed]`/`[inferred]`, dated Claude Code log lines and `(for=code)` markers.
-- Format: frontmatter `name` (path stem), `description` (one line, <150 chars, names the people/projects/places inside; sensitive files get a topic-only description), `sources` (keep existing, add `chat`), `aliases` (≤8). Content lines tagged `[stated]` only.
-- Never-store (delete on sight, no placeholder): government-ID / card / account numbers, immigration status, caste, a minor user's age, sexual history, abuse, criminal history or proceedings (including criminal case numbers and defence counsel), crime-victim status, suicide/self-harm/disordered eating, health or personality inferences the user did not state. Lines labelled "inferred/observed preferences" that the user never stated are NOT MINE.
-- Stated health, finances, religion etc. stay as stated; put any rewrite of such a file in its own write, after the ordinary writes.
-- Project stores can be isolated from global memory, so a global preference repeated inside a project store is NOT a duplicate; dedupe only within a store or between global files.
-- Merge files only within the same scope; after a merge, `memory_delete` the absorbed file (read it first for `if_version`) and repoint `[[links]]`.
-- Never announce saves inside user-facing copy; the report after the export lists them.
+Read the existing `index.md` first, then relevant `topics/*.md`. Preserve a legitimate topic index with one-line links and topic entries containing a date, a concise durable event/decision and its original `dc://` provenance link. Create/update a topic only when authorized and genuinely new; do not duplicate source content or invent a source URL. Preserve valid source links during cleanup and use them when relevant to an answer. Routine retrieval and writes stay quiet; do not append a canned “Saved to memory” footer.
 
-## Reconcile against session histories (mandatory)
+## Export only when requested or scheduled
 
-The owner's canonical decisions, names and paths live in his private agent sessions, not in memory. Memory is a cache of them. Before classifying any project, domain, brand, status or path entry as KEEP or SUPERSEDED, check it against:
+Reuse the requested canonical artifact and destination, or the applicable reporting policy's destination. Preserve other authors' and cloud/local sections; each executor updates only its owned section. Do not create exports, dated variants, logs or local scratch files for an audit that does not request them.
 
-1. The per-project Claude Code memory stores (`~/.claude/projects/*/memory/*.md`, especially the store for the matching repo): these are the distilled canonical decisions.
-2. The most recent raw sessions that mention the entity: `rg -l -i --no-messages "<term>" ~/.claude/projects ~/.codex/sessions/<current year>/<last 2 months>`, newest first; read the matching passages. Use `rg` — `find | xargs grep` over the ~3,000 monthly session files is too slow.
-3. Codex `~/.codex/memories/MEMORY.md`, Copilot `~/.copilot/session-state`, Kimi `~/.kimi`, and claude.ai chats (conversation_search) when the entity appears there.
-4. Live state when cheap and read-only (`dig`, `curl -sI`, provider APIs) to confirm a current-state claim.
+Organize the requested export as Instructions, Identity, Career, Projects and Preferences unless the user specifies another format. Put verified operational learning under its project; distinguish it from owner-stated instructions/preferences. Start project entries with the project name. Preserve useful density without repeating facts across categories.
 
-The newest of these sources wins over any memory line; fold the older value in as "(previously X)". Record each conflict you resolved and which source settled it in the report.
+Use one entry per line, oldest first, formatted `[YYYY-MM-DD] - Entry content.` Use the actual earliest supported statement/event date for that fact; use `[unknown]` when unavailable, not a file-copy or modification date. An inline export may use one code block; preserve an existing artifact's section and formatting contract.
 
-Ownership split: the local Claude desktop task `memory-audit-cleanup-daily` (04:00) owns the Mac stores (`~/.claude/projects/*/memory`, `~/.codex/memories`). A cloud run owns only the claude.ai memory store (`mcp__memory__*`). Both update the one canonical export `AI_REPORTS_MASTER/MEMORY_AUDIT/memory-export.md` on Drive in place; each run rewrites only its own section and leaves the other's untouched.
+Before publishing, check exact copy, attribution, dates, source coverage, counts, active waits and the applied/requested distinction. Open/read the persisted artifact once. A local save does not prove cloud synchronization; report the verified layer only.
+
+## Scheduled execution and closure
+
+A scheduler prompt should invoke this canonical skill with scope, ownership and output destination rather than embedding a second policy. Reuse the previous verified baseline and process changed items plus affected cross-store duplicates/supersessions; an mtime is a delta locator, never proof of factual chronology or full coverage. If the baseline is incomplete, cover the missing slice before claiming completeness.
+
+Retain recent in-flight work until source evidence proves it obsolete; no arbitrary age cutoff replaces that check. If nothing substantive changed, avoid rewriting the export merely to stamp a date unless the scheduler specifically requires it. Do not overwrite other executors' sections.
+
+Return the outcome with per-store and total before/after counts, exact coverage and unread slices, applied edits/deletions by reason, survivors, merges/rewrites, source conflicts resolved, failed writes and pending note-based requests. Separate reviewed, directly changed, correction requested and verified consolidated. Do not report “cleaned” or “deleted” for changes merely proposed or awaiting native consolidation. Finish feasible in-scope work and name only the genuine remaining dependency.
