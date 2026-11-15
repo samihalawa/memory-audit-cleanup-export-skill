@@ -25,6 +25,16 @@ Recover decisive original conversations or source passages for material conflict
 
 Resolve chronology by the actual statement or event time and scope. A copied file's latest modification time, an assistant's later summary or the newest search hit does not supersede an earlier owner decision. Distinguish source dates, observation dates and import dates; preserve uncertainty where the original date is unavailable.
 
+## Complaint and insistence sweep (every run, first)
+
+Owner order (15 Nov 2026): every audit or scheduled run starts by learning from Sami's complaints, before cleanup.
+
+1. Read every message Sami himself typed since the last run (at least 48 h; 16 days on a first run or after a gap): `~/.claude/projects/*/*.jsonl` (type "user", text parts only — skip tool results, isMeta, injected context and agent-to-agent briefs), `~/.claude/history.jsonl`, `~/.codex/sessions/<year>/<month>/*/*.jsonl` (`event_msg` → `user_message`), `~/.kimi*/user-history` and sessions, and any reachable claude.ai chat text.
+2. Locate frustration, complaint and insistence signals — never only one word such as "fuck": swearing in any language (shit, stupid, joder, coño, mierda, 他妈的, 靠…), hard redirects (no / nope / stop / wrong / "??" / "!!"), CAPS, "I always tell you", "how many times", "again", "I already told you", "te lo he dicho", "siempre te digo", "otra vez", "is that all", "why only…", "just do it", sarcasm, and the same request repeated across sessions or days even when said calmly. Keywords are only locators: read the exchange around each hit (what the agent did just before) and judge what went wrong and which standing rule he wants.
+3. For each signal: state the rule in his terms with date and a short quote; search every memory store for it (claude.ai store, `~/.codex/memories` MEMORY.md and `extensions/ad_hoc/notes`, `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.claude/projects/*/memory`). Missing → add it. Present but he complained again → the rule was missed: strengthen it (explicit, unconditional, higher in the file, "repeated complaint, <dates>").
+4. Write it everywhere it applies: claude.ai `/preferences.md` for general behaviour or the matching `/areas`, `/topics`, `/projects` file; Codex as a new `~/.codex/memories/extensions/ad_hoc/notes/<date>-<slug>.md` (frontmatter name/description/metadata type: feedback; Why + How to apply; never edit MEMORY.md directly); Claude Code as `~/.claude/projects/<project>/memory/<slug>.md` plus its MEMORY.md index line. These complaint-derived additions are authorized in all three stores by the owner even when a scheduler prompt limits other cleanup to one store.
+5. Never copy secret values into memory (point to 1Password). Skip one-off bugs already fixed that carry no reusable rule. Report each complaint: quote, rule, new / strengthened / already present, stores written.
+
 ## Classification
 
 Classify each substantive fact with its source, scope, date, reason and proposed survivor or correction:
